@@ -10,7 +10,7 @@ st.set_page_config(page_title="Stock AI Pro System", layout="wide")
 # --- 2. 持久化自選清單與狀態管理 ---
 # 使用 Session State 儲存清單，確保在當前工作階段中可增刪
 if 'watchlist' not in st.session_state:
-    st.session_state.watchlist = ["2330.TW", "NVDA", "AAPL", "1210.TW"]
+    st.session_state.watchlist = ["2330.TW", "NVDA", "AAPL", "8358.TWO"]
 
 if 'current_stock' not in st.session_state:
     st.session_state.current_stock = "2330.TW"
@@ -164,3 +164,4 @@ else:
 
     except Exception as e:
         st.error("⚠️ 系統請求過於頻繁，請點擊右上方選單 Reboot 或靜置 3 分鐘。")
+
