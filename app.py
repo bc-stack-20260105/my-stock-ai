@@ -34,7 +34,7 @@ def calculate_advanced_data(df):
 
 # --- 5. 側邊欄：控制中心 ---
 st.sidebar.header("🔍 控制中心")
-manual_input = st.sidebar.text_input("輸入股票代碼 (例: NVDA, AAPL):", key="ticker_input").upper()
+manual_input = st.sidebar.text_input("輸入股票代碼 (例: 2330.TW, NVDA, AAPL):", key="ticker_input").upper()
 
 # 這裡更新為您要求的週期選項
 time_range = st.sidebar.selectbox(
@@ -168,3 +168,4 @@ try:
 
 except Exception as e:
     st.error("⚠️ 數據請求過於頻繁，請等待 1 分鐘後重新整理頁面。")
+
