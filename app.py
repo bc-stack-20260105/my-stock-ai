@@ -97,7 +97,7 @@ try:
         fig.add_hline(y=support_p, line_dash="dash", line_color="green", annotation_text="支撐", row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['RSI_14'], name="RSI", line=dict(color='purple')), row=2, col=1)
         fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         # 面板 C: AI 停損與決策
         st.subheader("🤖 AI 風險控管與建議")
@@ -122,4 +122,5 @@ try:
             st.caption("註：停損位是根據過去14天平均波動幅度(ATR)計算，適合短中線防守。")
 
 except Exception as e:
+
     st.error(f"系統錯誤: {e}")
