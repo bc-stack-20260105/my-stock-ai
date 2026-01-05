@@ -14,9 +14,8 @@ if 'history' not in st.session_state:
 if 'current_stock' not in st.session_state:
     st.session_state.current_stock = "2330.TW"
 
-# --- 3. 定義回呼函數 (修正按鈕卡住問題) ---
+# --- 3. 定義回呼函數 (解決按鈕卡住) ---
 def select_stock(ticker):
-    """點擊歷史紀錄時觸發：清空輸入框並更新當前股票"""
     st.session_state.current_stock = ticker
     st.session_state.ticker_input = "" 
 
@@ -35,12 +34,15 @@ def calculate_advanced_data(df):
 
 # --- 5. 側邊欄：控制中心 ---
 st.sidebar.header("🔍 控制中心")
-
 manual_input = st.sidebar.text_input("輸入股票代碼 (例: NVDA, AAPL):", key="ticker_input").upper()
 
-time_range = st.sidebar.selectbox("分析週期", ("1mo", "3mo", "6mo", "1y", "2y", "5y"), index=2)
+# 這裡更新為您要求的週期選項
+time_range = st.sidebar.selectbox(
+    "分析週期", 
+    ("1d", "3d", "1w", "1mo", "3mo", "6mo", "1y", "2y", "5y"), 
+    index=4 # 預設顯示 3mo
+)
 
-# 手動輸入邏輯
 if manual_input and manual_input != st.session_state.current_stock:
     st.session_state.current_stock = manual_input
     if manual_input in st.session_state.history:
@@ -50,12 +52,10 @@ if manual_input and manual_input != st.session_state.current_stock:
 
 st.sidebar.divider()
 
-# 歷史紀錄顯示
 if st.session_state.history:
     st.sidebar.subheader("🕒 最近查詢紀錄")
     for idx, item in enumerate(st.session_state.history):
         col_name, col_del = st.sidebar.columns([4, 1])
-        # 使用 on_click 避開 Session State 報錯
         col_name.button(f"📈 {item}", key=f"hist_{item}_{idx}", on_click=select_stock, args=(item,))
         if col_del.button("❌", key=f"del_{item}_{idx}"):
             st.session_state.history.remove(item)
@@ -65,17 +65,28 @@ if st.session_state.history:
 
 target_stock = st.session_state.current_stock
 
-# --- 6. 主程式數據下載 (含快取機制) ---
-@st.cache_data(ttl=300)
+# --- 6. 數據抓取 (根據週期自動切換解析度) ---
+@st.cache_data(ttl=60) # 短週期快取縮短至 1 分鐘
 def fetch_data(ticker, period):
-    return yf.download(ticker, period=period, progress=False)
+    # 根據選定的週期自動決定數據間隔，確保短週期 K 線不留白
+    interval_map = {
+        "1d": "1m",   # 一天看 1 分鐘線
+        "3d": "5m",   # 三天看 5 分鐘線
+        "1w": "30m",  # 一週看 30 分鐘線
+        "1mo": "1d",
+        "3mo": "1d",
+        "6mo": "1d",
+        "1y": "1d",
+        "2y": "1d",
+        "5y": "1d"
+    }
+    return yf.download(ticker, period=period, interval=interval_map.get(period, "1d"), progress=False)
 
-# --- 7. 渲染介面 ---
+# --- 7. 主程式顯示邏輯 ---
 try:
     data = fetch_data(target_stock, time_range)
-    
     if data.empty:
-        st.warning(f"目前無法取得 {target_stock} 的數據，請稍後再試或檢查代碼。")
+        st.warning(f"目前無法取得 {target_stock} 數據，請檢查代碼或稍後再試。")
     else:
         df = calculate_advanced_data(data)
         ticker_info = yf.Ticker(target_stock).info
@@ -88,13 +99,13 @@ try:
         
         st.title(f"📊 {display_name} ({time_range}) 分析報告")
 
-        # 數據看板
+        # 頂部數據看板
         c1, c2, c3 = st.columns(3)
-        c1.metric("當前股價", f"${last_p:.2f}")
+        c1.metric("當前價格", f"${last_p:.2f}")
         c2.metric("RSI (14)", f"{rsi_now:.2f}")
         c3.metric("建議停損位", f"${(last_p - atr_now*2):.2f}")
 
-        # 繪製圖表
+        # K 線圖與指標
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.1, row_width=[0.3, 0.7])
         fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="K線"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['SMA_20'], name="20MA", line=dict(color='cyan')), row=1, col=1)
@@ -102,7 +113,7 @@ try:
         fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False)
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- AI 建議區 ---
+        # --- AI 建議與警告區 ---
         st.subheader("🤖 AI 投資建議與警告")
         if last_p < sma_20_now:
             if rsi_now < 30:
@@ -113,7 +124,21 @@ try:
             if rsi_now > 70:
                 st.error(f"🚨 **追高警告**：股價在 20MA 上方且 RSI ({rsi_now:.1f}) 已過熱，防範回檔。")
             else:
-                st.info("⚖️ **趨勢穩健**：股價站穩 20MA 且指標中性，建議續抱。")
+                st.info("⚖️ **趨勢穩健**：股價站穩 20MA 且指標中性，適合續抱。")
+
+        # --- 監控節奏建議 ---
+        st.divider()
+        st.subheader("📅 投資監控節奏建議")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.info("🕒 **一週一次 (週末)**")
+            st.markdown("* **週期**：選 **1y** 或 **5y**。\n* **重點**：確認長線大趨勢，20MA 是否持續向上。")
+        with col2:
+            st.info("📅 **三天一次**")
+            st.markdown("* **週期**：選 **3mo** 或 **3d**。\n* **重點**：觀察 RSI 是否開始在超賣/超買區反轉。")
+        with col3:
+            st.info("🔔 **一天一次 (收盤後)**")
+            st.markdown(f"* **週期**：選 **1mo** 或 **1d**。\n* **重點**：檢查股價是否跌破 **${(last_p - atr_now*2):.2f}**。")
 
         # --- 診斷教室 ---
         st.divider()
@@ -135,10 +160,11 @@ try:
         # --- SOP 指南 ---
         with st.expander("📝 系統核心操作指南 (SOP)"):
             st.markdown(f"""
-            1. **確認大趨勢**：先看 **1y**，確認股價與 20MA（藍線）的關係。
-            2. **尋找買賣點**：看 **3mo/1mo**。RSI < 30 留意「反彈潛力」；RSI > 70 留意「回檔風險」。
-            3. **防護網設定**：若跌破 **${(last_p - atr_now*2):.2f}**，必須執行停損。
+            1. **確認大趨勢**：先看 **1y**，確認股價與 20MA 的關係。
+            2. **尋找買賣點**：看 **3mo/1mo**。RSI < 30 找反彈；RSI > 70 防回檔。
+            3. **短線精研**：點選左側 **1d/3d** 觀看當前精細走勢。
+            4. **嚴格停損**：跌破建議位階必須離場。
             """)
 
 except Exception as e:
-    st.info("⚠️ 數據抓取異常，可能是 Yahoo Finance 流量限制，請稍候再試。")
+    st.error("⚠️ 數據請求過於頻繁，請等待 1 分鐘後重新整理頁面。")
