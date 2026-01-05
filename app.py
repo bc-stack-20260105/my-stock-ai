@@ -33,7 +33,7 @@ def calculate_advanced_data(df):
 # --- 4. 側邊欄：輸入與紀錄 ---
 st.sidebar.header("🔍 控制中心")
 
-manual_input = st.sidebar.text_input("輸入股票代碼 (例: NVDA, AAPL):", key="ticker_input").upper()
+manual_input = st.sidebar.text_input("輸入股票代碼 (例: 2330.TW, NVDA, AAPL):", key="ticker_input").upper()
 
 time_range = st.sidebar.selectbox(
     "分析週期", 
@@ -141,3 +141,4 @@ try:
 
 except Exception as e:
     st.info("請輸入正確的代碼以獲取 AI 分析資料。")
+
